@@ -401,6 +401,26 @@ class basic_parser
 #pragma warning pop
 #endif
 
+    template<unsigned Combination, bool StackEmpty_>
+    bool parse_value_case(
+        std::integral_constant<bool, StackEmpty_> stack_empty,
+        detail::const_stream_wrapper& cs,
+        unsigned options);
+
+    template<bool StackEmpty_>
+    void parse_value_switch(
+        std::integral_constant<bool, StackEmpty_> stack_empty,
+        std::integer_sequence<unsigned> combinations,
+        detail::const_stream_wrapper& cs,
+        unsigned options);
+
+    template<bool StackEmpty_, unsigned Combination0, unsigned... CombinationTail>
+    void parse_value_switch(
+        std::integral_constant<bool, StackEmpty_> stack_empty,
+        std::integer_sequence<unsigned, Combination0, CombinationTail...> combinations,
+        detail::const_stream_wrapper& cs,
+        unsigned options);
+
     template<bool StackEmpty_/*, bool Terminal_*/>
     const char* parse_comment(const char* p,
         std::integral_constant<bool, StackEmpty_> stack_empty,

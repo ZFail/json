@@ -384,6 +384,61 @@ suspend(
 
 template<class Handler>
 template<
+    unsigned Combination,
+    bool StackEmpty_>
+bool
+basic_parser<Handler>::
+parse_value_case(
+    std::integral_constant<bool, StackEmpty_> stack_empty,
+    detail::const_stream_wrapper& cs,
+    const unsigned options)
+{
+    if(options == Combination) {
+        cs = parse_value(cs.begin(),
+            stack_empty,
+            std::integral_constant<bool, !!(Combination & (1u << 0))>(),
+            std::integral_constant<bool, !!(Combination & (1u << 1))>(),
+            std::integral_constant<bool, !!(Combination & (1u << 2))>(),
+            std::integral_constant<bool, !!(Combination & (1u << 3))>());
+        return true;
+    }
+    return false;
+}
+
+template<class Handler>
+template<bool StackEmpty_>
+void
+basic_parser<Handler>::
+parse_value_switch(
+    std::integral_constant<bool, StackEmpty_> /*stack_empty*/,
+    std::integer_sequence<unsigned> /*combinations*/,
+    detail::const_stream_wrapper& /*cs*/,
+    unsigned /*options*/)
+{
+    BOOST_JSON_UNREACHABLE();
+}
+
+template<class Handler>
+template<
+    bool StackEmpty_,
+    unsigned Combination0,
+    unsigned... CombinationTail>
+void
+basic_parser<Handler>::
+parse_value_switch(
+    std::integral_constant<bool, StackEmpty_> stack_empty,
+    std::integer_sequence<unsigned, Combination0, CombinationTail...> /*combinations*/,
+    detail::const_stream_wrapper& cs,
+    const unsigned options)
+{
+    if(parse_value_case<Combination0>(stack_empty, cs, options))
+        return;
+    parse_value_switch(stack_empty,
+        std::integer_sequence<unsigned, CombinationTail...>(), cs, options);
+}
+
+template<class Handler>
+template<
     bool StackEmpty_/*,
     bool Terminal_*/>
 const char*
@@ -515,76 +570,13 @@ do_doc1:
     if(BOOST_JSON_UNLIKELY(! cs))
         return maybe_suspend(cs.begin(), state::doc1);
 do_doc2:
-    switch(+opt_.allow_comments |
-        (opt_.allow_trailing_commas << 1) |
-        (opt_.allow_invalid_utf8 << 2) |
-        (opt_.allow_infinity_and_nan << 3))
-    {
-    // no extensions
-    default:
-        cs = parse_value(cs.begin(), stack_empty, std::false_type(), std::false_type(), std::false_type(), std::false_type());
-        break;
-    // comments
-    case 1:
-        cs = parse_value(cs.begin(), stack_empty, std::true_type(), std::false_type(), std::false_type(), std::false_type());
-        break;
-    // trailing
-    case 2:
-        cs = parse_value(cs.begin(), stack_empty, std::false_type(), std::true_type(), std::false_type(), std::false_type());
-        break;
-    // comments & trailing
-    case 3:
-        cs = parse_value(cs.begin(), stack_empty, std::true_type(), std::true_type(), std::false_type(), std::false_type());
-        break;
-    // skip validation
-    case 4:
-        cs = parse_value(cs.begin(), stack_empty, std::false_type(), std::false_type(), std::true_type(), std::false_type());
-        break;
-    // comments & skip validation
-    case 5:
-        cs = parse_value(cs.begin(), stack_empty, std::true_type(), std::false_type(), std::true_type(), std::false_type());
-        break;
-    // trailing & skip validation
-    case 6:
-        cs = parse_value(cs.begin(), stack_empty, std::false_type(), std::true_type(), std::true_type(), std::false_type());
-        break;
-    // comments & trailing & skip validation
-    case 7:
-        cs = parse_value(cs.begin(), stack_empty, std::true_type(), std::true_type(), std::true_type(), std::false_type());
-        break;
-    // inf/nan
-    case 8:
-        cs = parse_value(cs.begin(), stack_empty, std::false_type(), std::false_type(), std::false_type(), std::true_type());
-        break;
-    // comments & inf/nan
-    case 9:
-        cs = parse_value(cs.begin(), stack_empty, std::true_type(), std::false_type(), std::false_type(), std::true_type());
-        break;
-    // trailing & inf/nan
-    case 10:
-        cs = parse_value(cs.begin(), stack_empty, std::false_type(), std::true_type(), std::false_type(), std::true_type());
-        break;
-    // comments & trailing & inf/nan
-    case 11:
-        cs = parse_value(cs.begin(), stack_empty, std::true_type(), std::true_type(), std::false_type(), std::true_type());
-        break;
-    // skip validation & inf/nan
-    case 12:
-        cs = parse_value(cs.begin(), stack_empty, std::false_type(), std::false_type(), std::true_type(), std::true_type());
-        break;
-    // comments & skip validation & inf/nan
-    case 13:
-        cs = parse_value(cs.begin(), stack_empty, std::true_type(), std::false_type(), std::true_type(), std::true_type());
-        break;
-    // trailing & skip validation & inf/nan
-    case 14:
-        cs = parse_value(cs.begin(), stack_empty, std::false_type(), std::true_type(), std::true_type(), std::true_type());
-        break;
-    // comments & trailing & skip validation & inf/nan
-    case 15:
-        cs = parse_value(cs.begin(), stack_empty, std::true_type(), std::true_type(), std::true_type(), std::true_type());
-        break;
-    }
+    parse_value_switch(stack_empty,
+        std::make_integer_sequence<unsigned, 16>(),
+        cs,
+        (unsigned{opt_.allow_comments} << 0) |
+        (unsigned{opt_.allow_trailing_commas} << 1) |
+        (unsigned{opt_.allow_invalid_utf8} << 2) |
+        (unsigned{opt_.allow_infinity_and_nan} << 3));
     if(BOOST_JSON_UNLIKELY(incomplete(cs)))
         return suspend_or_fail(state::doc2);
 do_doc3:
